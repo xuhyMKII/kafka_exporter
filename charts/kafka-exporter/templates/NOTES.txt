@@ -1,0 +1,9 @@
+{{/*这个文件包含了在Helm chart安装成功后显示给用户的信息。这些信息通常包括如何使用和测试安装的应用。
+在这个特定的文件中，它提供了如何通过kubectl命令获取Service的URL，以及如何访问kafka-exporter的指标页面。*/}}
+
+
+1.To see the metrics
+{{- if contains "ClusterIP" .Values.service.type }}
+  kubectl port-forward svc/{{ include "kafka-exporter.fullname" . }} {{ .Values.service.port }}
+  echo "Visit http://127.0.0.1:{{ .Values.service.port }} to use your application"
+{{- end }}

@@ -1,0 +1,56 @@
+{{/*  配置Prometheus Operator来发现和抓取kafka-exporter的指标。
+
+Kafka Exporter从Kafka中抓取数据：Kafka Exporter是一个专门为Kafka设计的Prometheus exporter。
+它的主要任务是连接到Kafka集群，从中抓取指标数据，然后将这些数据转换为Prometheus可以理解的格式。
+这些指标数据通常会被暴露在一个HTTP端点（通常是/metrics）上，等待被Prometheus抓取。
+
+Prometheus Operator从Kafka Exporter中抓取数据：Prometheus Operator是一个Kubernetes Operator，
+用于管理Prometheus实例和相关的监控资源。其中一个关键的资源是ServiceMonitor，
+它定义了Prometheus如何发现服务并从这些服务中抓取指标数据。在我们的例子中，
+ServiceMonitor会被配置为发现Kafka Exporter服务，并从其/metrics端点抓取指标数据。
+
+整个流程是：Kafka Exporter从Kafka中抓取数据，转换为Prometheus格式，
+然后Prometheus Operator从Kafka Exporter中抓取这些数据，最后这些数据会被存储在Prometheus中，
+可以通过Prometheus的查询API或Grafana等工具进行查询和可视化。
+
+*/}}
+
+{{- if .Values.prometheus.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "kafka-exporter.fullname" . }}
+  {{- if .Values.prometheus.serviceMonitor.namespace }}
+  namespace: {{ .Values.prometheus.serviceMonitor.namespace }}
+  {{- end }}
+  labels:
+    app.kubernetes.io/name: {{ include "kafka-exporter.name" . }}
+    helm.sh/chart: {{ include "kafka-exporter.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    {{- if .Values.labels -}}
+    {{ .Values.labels | toYaml | nindent 4 -}}
+    {{- end }}
+    {{- if .Values.prometheus.serviceMonitor.additionalLabels }}
+{{ toYaml .Values.prometheus.serviceMonitor.additionalLabels | indent 4 -}}
+    {{- end }}
+spec:
+  jobLabel: jobLabel
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "kafka-exporter.name" . }}
+      helm.sh/chart: {{ include "kafka-exporter.chart" . }}
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}
+  endpoints:
+  - port: metrics
+    interval: {{ .Values.prometheus.serviceMonitor.interval }}
+    {{- if .Values.prometheus.serviceMonitor.scrapeTimeout }}
+    scrapeTimeout: {{ .Values.prometheus.serviceMonitor.scrapeTimeout }}
+    {{- end }}
+    {{- if .Values.prometheus.serviceMonitor.metricRelabelings }}
+    metricRelabelings:
+    {{- toYaml .Values.prometheus.serviceMonitor.metricRelabelings | nindent 4 }}
+  {{- end }}
+  {{- end }}
